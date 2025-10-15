@@ -10,18 +10,29 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 from model import SymptomRecommender
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
 google_api_key = os.getenv("GOOGLE_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
-llm = ChatGoogleGenerativeAI(
+llm2 = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0,
     max_tokens=None,
     timeout=None,
     max_retries=2,
     api_key=google_api_key
+)
+
+llm = ChatOpenAI(
+    model="gpt-4.1-mini",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    api_key=openai_api_key
 )
 
 # Configure logging

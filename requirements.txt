@@ -13,3 +13,4 @@ pyyaml
 httpx
 langchain-google-genai
 dotenv
+langchain-openai

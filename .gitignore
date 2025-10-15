@@ -42,9 +42,21 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Jupyter
 .ipynb_checkpoints/
 
 # Data (optional - uncomment if you don't want to track CSV)
 # *.csv
+
+# Environment variables
+.env
+
+# Docker
+.dockerignore
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
