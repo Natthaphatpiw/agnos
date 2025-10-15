@@ -1,0 +1,34 @@
+[
+    {
+    "symptoms": ["น้ำตาไหล"],
+    "gender": "male",
+    "age": 26,
+    "top_k": 5,
+    "DL_Hybrid": {
+    "recommendations": ["ไอ","ปวดจมูก","ประวัติโรคหัวใจ","ตาลายหน้ามืด","คันตา"]
+    },
+    "ML_Hybrid": {
+        "recommendations": ["การรักษาก่อนหน้า",
+        "ไอ",
+        "เสมหะ",
+        "เคืองตา",
+        "Previous treatment"]
+    }
+},
+{
+    "symptoms": ["ankle pain"],
+    "gender": "male",
+    "age": 26,
+    "top_k": 5,
+    "DL_Hybrid": {
+    "recommendations": ["ไอ","แขนบวม","แขนขาอ่อนแรง","ปวดข้อนิ้วมือ","คัดจมูกไอ"]
+    },
+    "ML_Hybrid": {
+        "recommendations": ["การรักษาก่อนหน้า",
+        "ไอ",
+        "เสมหะ",
+        "joint pain",
+        "History of trauma"]
+    }
+}
+]

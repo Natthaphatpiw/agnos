@@ -7,3 +7,9 @@ pandas
 numpy
 networkx
 scikit-learn
+pytest
+pytest-cov
+pyyaml
+httpx
+langchain-google-genai
+dotenv

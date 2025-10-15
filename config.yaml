@@ -1,0 +1,75 @@
+# Symptom Recommendation System Configuration
+
+# Model Architecture
+model:
+  symptom_embed_dim: 128      # Dimension of symptom embeddings
+  demog_embed_dim: 16          # Dimension of demographic embeddings
+  gat_heads: 4                 # Number of attention heads in GAT
+  dropout: 0.3                 # Dropout rate for regularization
+
+  # Fusion weights for hybrid model
+  fusion_weights:
+    collaborative_filtering: 0.4
+    content_based: 0.4
+    graph_neural_network: 0.2
+
+# Training Configuration
+training:
+  epochs: 50                   # Maximum number of training epochs
+  batch_size: 32               # Batch size for training
+  learning_rate: 0.001         # Initial learning rate
+  weight_decay: 0.00001        # L2 regularization coefficient
+
+  # Early Stopping
+  early_stopping:
+    patience: 5                # Number of epochs to wait before stopping
+    min_delta: 0.001           # Minimum improvement to consider
+
+  # Learning Rate Scheduler
+  scheduler:
+    mode: 'max'                # Maximize validation metric
+    factor: 0.5                # Reduce LR by this factor
+    patience: 3                # Wait this many epochs before reducing LR
+    min_lr: 0.00001            # Minimum learning rate
+
+# Data Configuration
+data:
+  csv_path: 'AI symptom picker data.csv'
+  train_split: 0.8             # 80% for training
+  val_split: 0.1               # 10% for validation
+  test_split: 0.1              # 10% for testing
+  random_seed: 42              # For reproducibility
+
+# API Configuration
+api:
+  host: '0.0.0.0'
+  port: 8000
+  reload: false                # Set to true in development
+  log_level: 'info'
+
+  # Default values
+  defaults:
+    top_k: 5                   # Default number of recommendations
+
+# Evaluation Metrics
+evaluation:
+  k_values: [5, 10]            # Compute metrics for top-K predictions
+
+# File Paths
+paths:
+  model_weights: 'model.pth'
+  model_config: 'model_config.pkl'
+  graph_data: 'graph.pt'
+  symptom_to_idx: 'symptom_to_idx.pkl'
+  idx_to_symptom: 'idx_to_symptom.pkl'
+  age_bins: 'age_bins.pkl'
+  train_history: 'training_history.pkl'
+  overfitting_analysis: 'overfitting_analysis.pkl'
+
+# Logging Configuration
+logging:
+  level: 'INFO'
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: 'symptom_api.log'
+  max_bytes: 10485760          # 10MB
+  backup_count: 5

@@ -5,31 +5,14 @@ import torch
 import pickle
 import logging
 from contextlib import asynccontextmanager
-import getpass
-import os
-from langchain_google_genai import ChatGoogleGenerativeAI
-from dotenv import load_dotenv
+
 from model import SymptomRecommender
-
-load_dotenv()
-
-google_api_key = os.getenv("GOOGLE_API_KEY")
-
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-    api_key=google_api_key
-)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global variables for model and artifacts
-
 model = None
 symptom_to_idx = None
 idx_to_symptom = None
@@ -57,7 +40,18 @@ async def lifespan(app: FastAPI):
         with open('age_bins.pkl', 'rb') as f:
             age_bins = pickle.load(f)
 
-        with open('model_config.pkl', 'rb') as f:
+        # Try to load improved model first, fallback to original
+        import os
+        if os.path.exists('model_config_improved.pkl') and os.path.exists('model_improved.pth'):
+            config_path = 'model_config_improved.pkl'
+            model_path = 'model_improved.pth'
+            logger.info("Using IMPROVED model (better performance, verified no overfitting)")
+        else:
+            config_path = 'model_config.pkl'
+            model_path = 'model.pth'
+            logger.info("Using ORIGINAL model")
+
+        with open(config_path, 'rb') as f:
             model_config = pickle.load(f)
 
         graph_data = torch.load('graph.pt', weights_only=False)
@@ -73,7 +67,7 @@ async def lifespan(app: FastAPI):
         ).to(device)
 
         # Load trained weights
-        model.load_state_dict(torch.load('model.pth', map_location=device, weights_only=True))
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
         model.eval()
 
         edge_index = edge_index.to(device)
@@ -98,12 +92,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-class SymptomRecommendation(BaseModel):
-    recommendations: List[str] = Field(..., description="List of recommended symptoms")
-    query_symptoms: List[str] = Field(..., description="Original query symptoms from user")
-    unknown_symptoms: List[str] = Field(default=[], description="Symptoms not found in vocabulary")
-    score: float = Field(..., description="Score of the recommendations (0-1)")
-    reason: str = Field(..., description="Brief reason for the recommendations (max 200 chars)")
 
 class RecommendRequest(BaseModel):
     """Request model for symptom recommendations"""
@@ -215,49 +203,11 @@ async def recommend_symptoms(request: RecommendRequest = Body(...)):
 
         logger.info(f"Generated {len(recommendations)} recommendations for {request.gender}/{request.age} with symptoms {known_symptoms}")
 
-        recommendations = RecommendResponse(
+        return RecommendResponse(
             recommendations=recommendations,
             query_symptoms=known_symptoms,
             unknown_symptoms=unknown_symptoms
         )
-
-        structured_llm_default = llm.with_structured_output(SymptomRecommendation)
-
-        # Improved prompt engineering for better LLM evaluation
-        prompt = f"""คุณเป็นผู้เชี่ยวชาญด้านการแพทย์ที่ช่วยวิเคราะห์และปรับปรุงคำแนะนำอาการจากระบบ Deep Learning
-
-**ข้อมูลจากผู้ป่วย:**
-- เพศ: {request.gender}
-- อายุ: {request.age} ปี
-- อาการที่ป้อนเข้ามา: {', '.join(known_symptoms) if known_symptoms else 'ไม่มี'}
-
-**คำแนะนำจากระบบ DL:**
-{', '.join(recommendations.recommendations) if recommendations.recommendations else 'ไม่มี'}
-
-**ภารกิจของคุณ:**
-1. กรองอาการที่ไม่เกี่ยวข้องทางการแพทย์ ซ้ำซ้อน หรือเป็นข้อมูลพื้นฐาน (เช่น "การรักษาก่อนหน้า")
-2. แปลคำภาษาอังกฤษเป็นภาษาไทยที่เข้าใจง่าย
-3. จัดลำดับตามความสำคัญทางคลินิก
-4. เลือก 3-7 อาการที่มีคุณภาพ
-
-**เกณฑ์การให้คะแนน:**
-- 0.9-1.0: เกี่ยวข้องสูงมาก
-- 0.7-0.89: เกี่ยวข้อง มีบางข้อต้องปรับ
-- 0.5-0.69: เกี่ยวข้องบางส่วน
-- <0.5: ไม่เกี่ยวข้อง
-
-**รูปแบบการตอบกลับ:**
-- recommendations: รายการอาการที่แนะนำ (3-7 อาการ ภาษาไทย)
-- query_symptoms: {known_symptoms}
-- unknown_symptoms: {unknown_symptoms}
-- score: คะแนน 0-1
-- reason: เหตุผลสั้นๆ ไม่เกิน 150 ตัวอักษร สรุปใจความสำคัญเท่านั้น
-
-กรุณาวิเคราะห์และให้คำแนะนำที่ดีขึ้น"""
-
-        result = structured_llm_default.invoke(prompt)
-
-        return result
 
     except HTTPException:
         raise
