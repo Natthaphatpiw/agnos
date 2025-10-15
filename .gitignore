@@ -27,9 +27,7 @@ ENV/
 .venv
 
 # Model artifacts
-model.pth
-*.pkl
-graph.pt
+
 
 # IDE
 .vscode/
