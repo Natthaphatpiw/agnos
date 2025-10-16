@@ -17,23 +17,29 @@ load_dotenv()
 google_api_key = os.getenv("GOOGLE_API_KEY")
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
-llm2 = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-    api_key=google_api_key
-)
+# Initialize LLM based on available API keys
+llm = None
+llm2 = None
 
-llm = ChatOpenAI(
-    model="gpt-4.1-mini",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-    api_key=openai_api_key
-)
+if openai_api_key:
+    llm = ChatOpenAI(
+        model="gpt-4.1-mini",
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        api_key=openai_api_key
+    )
+
+if google_api_key:
+    llm2 = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        api_key=google_api_key
+    )
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -232,7 +238,29 @@ async def recommend_symptoms(request: RecommendRequest = Body(...)):
             unknown_symptoms=unknown_symptoms
         )
 
-        structured_llm_default = llm.with_structured_output(SymptomRecommendation)
+        # Determine which LLM to use based on available API keys
+        # Priority: llm (OpenAI) > llm2 (Google) > None (DL only)
+        selected_llm = None
+        if openai_api_key:
+            selected_llm = llm
+            logger.info("Using OpenAI (llm) for recommendation enhancement")
+        elif google_api_key:
+            selected_llm = llm2
+            logger.info("Using Google (llm2) for recommendation enhancement")
+        else:
+            logger.info("No API key found, returning DL recommendations only")
+
+        # If no LLM available, return DL recommendations directly
+        if selected_llm is None:
+            return SymptomRecommendation(
+                recommendations=recommendations.recommendations,
+                query_symptoms=known_symptoms,
+                unknown_symptoms=unknown_symptoms,
+                score=0.8,  # Default score for DL-only
+                reason="ผลลัพธ์จาก Deep Learning โดยตรง (ไม่มี LLM)"
+            )
+
+        structured_llm_default = selected_llm.with_structured_output(SymptomRecommendation)
 
         # Improved prompt engineering for better LLM evaluation
         prompt = f"""คุณเป็นผู้เชี่ยวชาญด้านการแพทย์ที่ช่วยวิเคราะห์และปรับปรุงคำแนะนำอาการจากระบบ Deep Learning

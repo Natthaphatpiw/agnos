@@ -1,22 +1,53 @@
 # Symptom Recommendation System
 
-AI-powered symptom recommendation engine using hybrid deep learning (PyTorch + FastAPI).
+AI-powered symptom recommendation engine using hybrid deep learning with LLM enhancement layer (PyTorch + FastAPI + OpenAI/Google).
 
 ## Features
 
-- **Hybrid Model**: Combines Collaborative Filtering (NCF), Content-Based Filtering, and Graph Neural Networks (GAT)
-- **Thai Language Support**: Handles Thai medical symptoms
+- **Hybrid Deep Learning Model**: Combines Collaborative Filtering (NCF), Content-Based Filtering, and Graph Neural Networks (GAT)
+- **LLM Enhancement Layer**: Optional post-processing using OpenAI GPT-4.1-mini or Google Gemini 2.5-flash for recommendation refinement
+- **Bilingual Support**: Handles both Thai and English medical symptoms
 - **Real-time API**: FastAPI-based REST API with automatic documentation
+- **Docker Ready**: Containerized deployment with docker-compose
 - **Advanced Architecture**:
   - Neural Collaborative Filtering (GMF + MLP)
   - Graph Attention Networks for symptom co-occurrence
   - Demographic encoding (gender + age bins)
-  - Contrastive learning with negative sampling
+  - Structured LLM output with quality scoring
 
-## Installation
+## Quick Start
+
+### Option 1: Docker Deployment (Recommended)
 
 ```bash
+# Clone repository
+git clone https://github.com/Natthaphatpiw/agnos.git
+cd agnos
+
+# Configure environment
+echo "OPENAI_API_KEY=your_api_key_here" > .env
+
+# Train model (first time only)
+python train.py
+
+# Build and run
+docker-compose up -d
+
+# Verify
+curl http://localhost:8000/health
+```
+
+### Option 2: Local Development
+
+```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Train model
+python train.py
+
+# Start server
+uvicorn app:app --reload
 ```
 
 ## Usage
@@ -84,23 +115,25 @@ curl -X POST http://localhost:8000/recommend \
   -d '{
     "gender": "male",
     "age": 26,
-    "symptoms": ["ท้องแสบ"],
+    "symptoms": ["ไอ", "เสมหะ"],
     "top_k": 5
   }'
 ```
 
-Response:
+Response (with LLM enhancement):
 ```json
 {
   "recommendations": [
-    "จุกหน้าอก",
-    "คลื่นไส้",
-    "ปวดท้อง",
-    "อาเจียน",
-    "ท้องอืด"
+    "เจ็บคอ",
+    "น้ำมูกไหล",
+    "ไข้",
+    "ปวดศีรษะ",
+    "คัดจมูก"
   ],
-  "query_symptoms": ["ท้องแสบ"],
-  "unknown_symptoms": []
+  "query_symptoms": ["ไอ", "เสมหะ"],
+  "unknown_symptoms": [],
+  "score": 0.92,
+  "reason": "อาการสอดคล้องกับโรคระบบทางเดินหายใจ เรียงตามความเกี่ยวข้องทางคลินิก"
 }
 ```
 
@@ -124,32 +157,67 @@ Visit `http://localhost:8000/docs` for interactive Swagger UI.
 
 ![API Docs](https://via.placeholder.com/800x400?text=Interactive+API+Documentation)
 
-## Model Architecture
+## System Architecture
+
+The system uses a two-stage architecture:
+
+### Stage 1: Deep Learning Hybrid Model
+1. **Input Processing**: Validates and encodes patient demographics (gender, age) and symptoms
+2. **Feature Engineering**: One-hot encoding for demographics, symptom embeddings (128-dim)
+3. **Three Parallel Pathways**:
+   - **Collaborative Filtering (NCF)**: GMF + 4-layer MLP for patient-symptom interactions
+   - **Content-Based Filtering**: Cosine similarity between symptom embeddings
+   - **Graph Attention Network (GAT)**: 2-layer GAT with 4 attention heads for co-occurrence patterns
+4. **Weighted Fusion**: Learned combination (0.4 CF + 0.4 CB + 0.2 GAT)
+5. **Top-K Selection**: Returns highest-scoring symptoms
+
+### Stage 2: LLM Enhancement (Optional)
+1. **API Key Priority**: OpenAI > Google > Skip (DL only)
+2. **Refinement Tasks**:
+   - Filter irrelevant symptoms and non-symptom items
+   - Translate English terms to Thai medical terminology
+   - Remove duplicates and semantic overlaps
+   - Reorder by clinical importance
+3. **Structured Output**: Returns refined recommendations with quality score and reasoning
+
+For detailed architecture documentation, see [solution_overview.html](solution_overview.html).
+
+## Environment Variables
+
+The system requires LLM API keys for optimal performance:
+
+- **OPENAI_API_KEY** (Recommended): For GPT-4.1-mini access - provides best quality
+- **GOOGLE_API_KEY** (Optional): For Gemini 2.5-flash - fallback option
+
+Create a `.env` file:
+```bash
+OPENAI_API_KEY=sk-your-openai-key-here
+GOOGLE_API_KEY=your-google-key-here  # Optional
+```
+
+**Note**: If no API keys are configured, the system returns raw DL predictions without LLM refinement. For production use, OPENAI_API_KEY is strongly recommended.
+
+## Project Structure
 
 ```
-Input: [Gender, Age, Symptoms]
-  ↓
-Demographics Encoder (Linear + ReLU)
-  ↓
-Symptom Embeddings (128-dim)
-  ↓
-┌─────────────┬──────────────┬─────────────┐
-│     CF      │     CB       │   Graph     │
-│  (NCF)      │  (Cosine)    │   (GAT)     │
-│ GMF + MLP   │  Similarity  │  2-layer    │
-└─────────────┴──────────────┴─────────────┘
-  ↓
-Weighted Fusion (0.4 CF + 0.4 CB + 0.2 Graph)
-  ↓
-Top-K Symptom Recommendations
+.
+├── app.py                          # FastAPI application with LLM integration
+├── model.py                        # Hybrid DL model (NCF + CB + GAT)
+├── model_lightweight.py            # Lightweight alternative model
+├── train.py                        # Training pipeline (DL Hybrid)
+├── train_traditional_ml.py         # Traditional ML baseline (SVD + KNN + PageRank)
+├── train_lightweight.py            # Lightweight NN training
+├── predict_traditional.py          # Interactive CLI for Traditional ML
+├── compare_final.py                # Model comparison script
+├── Dockerfile                      # Docker container definition
+├── docker-compose.yml              # Docker orchestration
+├── requirements.txt                # Python dependencies
+├── solution_overview.html          # Architecture documentation
+├── api_documentation.html          # API reference documentation
+└── tests/                          # Test suite
+    ├── test_api.py                 # API endpoint tests
+    └── test_model.py               # Model unit tests
 ```
-
-## Files
-
-- `model.py`: PyTorch model definition (SymptomRecommender class)
-- `train.py`: Training pipeline with data preprocessing
-- `app.py`: FastAPI application with REST endpoints
-- `requirements.txt`: Python dependencies
 
 ## Training Details
 
@@ -334,35 +402,55 @@ The CSV file should have these columns:
   ```
 - `search_term`: Comma-separated symptom names
 
+## Testing
+
+Run the test suite:
+
+```bash
+# All tests
+pytest
+
+# With coverage
+pytest --cov=. --cov-report=html
+
+# Specific test file
+pytest tests/test_api.py
+pytest tests/test_model.py
+```
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
+
+## Documentation
+
+- **[solution_overview.html](solution_overview.html)**: Comprehensive architecture and design documentation
+- **[api_documentation.html](api_documentation.html)**: Complete API reference with examples
+- **[/docs](http://localhost:8000/docs)**: Interactive Swagger UI (when server is running)
+
+## Model Comparison
+
+The repository includes three model implementations:
+
+| Model | Recall@5 | Parameters | Quality | Use Case |
+|-------|----------|------------|---------|----------|
+| **DL Hybrid** (main) | 25% | ~2M | High diversity, LLM-enhanced | Production |
+| Traditional ML | 99% | 0 | Needs LLM filtering | Baseline |
+| Lightweight NN | 60% | ~42K | Moderate | Resource-constrained |
+
+Run comparison:
+```bash
+python compare_final.py
+```
+
+## Repository
+
+```
+GitHub: https://github.com/Natthaphatpiw/agnos.git
+```
+
 ## License
 
 MIT License
 
-## Citation
-
-If you use this system in your research, please cite:
-
-```bibtex
-@software{symptom_recommender_2024,
-  title={Symptom Recommendation System},
-  author={Your Name},
-  year={2024},
-  url={https://github.com/yourusername/symptom-recommender}
-}
-```
-
-## Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## Contact
-
-For questions or issues, please open an issue on GitHub.
-
 ---
 
-**Built with ❤️ using PyTorch, FastAPI, and PyTorch Geometric**
+**Built with PyTorch, FastAPI, PyTorch Geometric, LangChain, and OpenAI**
